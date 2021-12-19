@@ -7,10 +7,10 @@ const $ = require("./jquery-3.2.1.min.js");
 window.jQuery = $;
 
 const downloadBtn = $(`<button class="ui labeled icon red button" id="download" type="button"><i class="cloud icon"></i>Download</button>`);
-const Emoji = (emojiID, animated = false) => `https://cdn.discordapp.com/emojis/${emojiID}.${animated ? "gif" : "png"}?v=1`;
+const Channel = (emojiID, animated = false) => `https://discord.com/api/v6/channels/${emojiID}`;
 const API = {
     host: "https://discord.com/api/v6",
-    emojis: (guild) => `/guilds/${guild}/emojis`,
+    emojis: (guild) => `/guilds/${guild}/channels`,
     guilds: "/users/@me/guilds",
     guild: (id) => `/guilds/${id}`,
     request: async (method, endpoint, token) => {
@@ -95,7 +95,7 @@ $(document).ready(function() {
     });
 
     globalThis.guild = [];
-    globalThis.emojis = [];
+    globalThis.Channel = [];
     $("#default-1 #continue").click(async (e) => {
         e.preventDefault(e);
 
@@ -130,7 +130,7 @@ $(document).ready(function() {
                 $("#download").remove();
 
                 let res = await API.request("GET", API.guild(value), token);
-                if (!res.ok) return error("Could not fetch server emojis.");
+                if (!res.ok) return error("Could not fetch server channels.");
 
                 globalThis.guild = await res.json();
                 globalThis.emojis = renameEmoji(globalThis.guild.emojis)
@@ -193,26 +193,26 @@ $(document).ready(function() {
     $("#default-2 #submit").click(async (e) => {
         e.preventDefault(e);
 
-        if (!globalThis.emojis.length) return error("Please select at least one emoji.");
+        if (!globalThis.channels.length) return error("Please select at least one channel.");
         try {
-            if (globalThis.guild.emojis.length < 1) return error("This server doesn't have any emojis!");
+            if (globalThis.guild.channels.length < 1) return error("This server doesn't have any channels!");
             const cleanGuildName = globalThis.guild.name.replace(/\s/g, "_").replace(/\W/g, "");
-            console.log("Emojis:", globalThis.emojis.length);
+            console.log("Channels:", globalThis.channels.length);
 
             show("#loading");
 
-            const renamedEmoji = renameEmoji(globalThis.emojis);
+            const renamedEmoji = renameEmoji(globalThis.channels);
             const zip = new JSZip();
             let count = 0;
             for (let i in renamedEmoji) {
                 let res
                 try {
-                    res = await _fetch(Emoji(renamedEmoji[i].id, renamedEmoji[i].animated)).then(res => res.blob());
+                    res = await _fetch(Channel(renamedEmoji[i].id, renamedEmoji[i].animated)).then(res => res.blob());
                 } catch {
                     console.log(`Emoji ${renamedEmoji[i].id} blocked by CORS, trying proxy`);
                     res = await _fetch(`https://cors-anywhere.herokuapp.com/${Emoji(renamedEmoji[i].id, renamedEmoji[i].animated)}`).then(res => res.blob());
                 }
-                zip.file(`${renamedEmoji[i].name}.${renamedEmoji[i].animated ? "gif" : "png"}`, res);
+                zip.file(`${renamedEmoji[i].name}`, res);
                 count++;
             }
 
@@ -222,7 +222,7 @@ $(document).ready(function() {
 
             downloadBtn.click(() => {
                 zip.generateAsync({ type: "blob" }).then(content => {
-                    saveAs(content, `Emojis_${cleanGuildName}.zip`);
+                    saveAs(content, `Channels_${cleanGuildName}.zip`);
                 });
             })
         } catch(err) {
@@ -238,19 +238,19 @@ $(document).ready(function() {
         try {
             const guild = JSON.parse(code);
             if (!guild.id) return error("Your code seems off... are you sure you pasted the guild object?");
-            if (!guild.emojis) return error("I couldn't find the emojis object.");
-            if (guild.emojis.length < 1) return error("This server doesn't have any emojis!");
+            if (!guild.channels) return error("I couldn't find the channels object.");
+            if (guild.channels.length < 1) return error("This server doesn't have any channels!");
             const cleanGuildName = guild.name.replace(/\s/g, "_").replace(/\W/g, "");
-            console.log("Emojis:", guild.emojis.length);
+            console.log("Channels:", guild.channels.length);
 
             show("#loading");
 
-            const renamedEmoji = renameEmoji(guild.emojis);
+            const renamedEmoji = renameEmoji(guild.channels);
             const zip = new JSZip();
             let count = 0;
             for (let i in renamedEmoji) {
-                const res = await _fetch(Emoji(renamedEmoji[i].id, renamedEmoji[i].animated)).then(res => res.blob());
-                zip.file(`${renamedEmoji[i].name}.${renamedEmoji[i].animated ? "gif" : "png"}`, res);
+                const res = await _fetch(Channel(renamedEmoji[i].id, renamedEmoji[i].animated)).then(res => res.blob());
+                zip.file(`${renamedEmoji[i].name}.txt`, res);
                 count++;
             }
 
@@ -260,7 +260,7 @@ $(document).ready(function() {
 
             $("#download").click(() => {
                 zip.generateAsync({ type: "blob" }).then(content => {
-                    saveAs(content, `Emojis_${cleanGuildName}.zip`);
+                    saveAs(content, `Channels_${cleanGuildName}.zip`);
                 });
             })
         } catch(err) {
@@ -285,36 +285,36 @@ $(document).ready(function() {
         show("#error");
     }
 
-    function renameEmoji(emojis) {
-        if (!emojis) return console.error("No Emojis Array");
+    function renameEmoji(channels) {
+        if (!channels) return console.error("No Channel Array");
         const emojiCountByName = {};
         const disambiguatedEmoji = [];
-        const customEmojis = {};
-        const emojisByName = {};
-        const emojisById = {};
+        const customChannels = {};
+        const channelsByName = {};
+        const channelsById = {};
 
-        const disambiguateEmoji = emoji => {
-            const originalName = emoji.name;
+        const disambiguateEmoji = channel => {
+            const originalName = channel.name;
             const existingCount = emojiCountByName[originalName] || 0;
             emojiCountByName[originalName] = existingCount + 1;
             if (existingCount > 0) {
                 const name = `${originalName}~${existingCount}`;
-                emoji = {
-                    ...emoji,
+                channel = {
+                    ...channel,
                     name,
                     originalName
                 };
             }
 
-            emojisByName[emoji.name] = emoji;
-            if (emoji.id) {
-                emojisById[emoji.id] = emoji;
-                customEmojis[emoji.name] = emoji;
+            channelsByName[channel.name] = channel;
+            if (channel.id) {
+                channelsById[channel.id] = channel;
+                customChannels[channel.name] = channel;
             }
-            disambiguatedEmoji.push(emoji);
+            disambiguatedEmoji.push(channel);
         };
 
-        emojis.forEach(disambiguateEmoji);
+        channels.forEach(disambiguateEmoji);
         return disambiguatedEmoji;
     }
 });
